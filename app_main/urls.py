@@ -1,3 +1,5 @@
+# app_main/urls.py
+
 from django.urls import path
 from . import views  # views에서 API 로직을 처리할 예정
 

@@ -1,3 +1,5 @@
+# config/settings.py
+
 import os
 from dotenv import load_dotenv
 from mongoengine import connect
@@ -23,11 +25,10 @@ INSTALLED_APPS = [
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
-    'django.contrib.staticfiles',  # Static files 앱은 기본적으로 필요
+    'django.contrib.staticfiles',
     'app_main',  # MongoDB 연동을 위한 앱
 ]
 
-# MIDDLEWARE 설정 (기본적인 보안 미들웨어와 인증 미들웨어만 포함)
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -38,5 +39,4 @@ MIDDLEWARE = [
 ROOT_URLCONF = 'config.urls'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# Static files (CSS, JavaScript, Images)
 STATIC_URL = '/static/'
