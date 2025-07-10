@@ -1,8 +1,8 @@
-# app_main/models.py
-
 from mongoengine import Document, fields
 from enum import Enum
 from datetime import datetime
+import gridfs
+from mongoengine.connection import get_db
 
 
 # 상태를 나타내는 Enum 클래스 정의
@@ -12,12 +12,13 @@ class Status(Enum):
     WEAPONIZED = "Weaponized"
 
 
-# 사진 모델 정의
-class Photo(Document):
-    image = fields.ImageField(upload_to='photos/')  # 사진 파일 저장
-    created_at = fields.DateTimeField(default=datetime.utcnow)  # 사진 업로드 시간
+# 영상 모델 정의
+class Video(Document):
+    video = fields.FileField()  # 영상 파일 저장
+    created_at = fields.DateTimeField(default=datetime.utcnow)  # 영상 업로드 시간
     status = fields.StringField(choices=[(status.name, status.value) for status in Status],
                                 default=Status.NORMAL.name)  # 상태 (Enum으로 처리)
 
     def __str__(self):
-        return f"Photo uploaded at {self.created_at}, Status: {self.status}"
+        return f"Video uploaded at {self.created_at}, Status: {self.status}"
+
