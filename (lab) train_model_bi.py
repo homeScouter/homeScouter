@@ -116,31 +116,29 @@ import torch.nn.functional as F
 import torch.nn as nn
 
 class ResidualMLP(nn.Module):
-    def __init__(self, dropout_rate=0.3):
+    def __init__(self, dropout_rate=0.5):
         super().__init__()
-        self.fc1 = nn.Linear(512, 256)
-        self.norm1 = nn.LayerNorm(256)
+        self.fc1 = nn.Linear(512, 64)
+        self.norm1 = nn.LayerNorm(64)
         self.dropout1 = nn.Dropout(dropout_rate)
 
-        self.fc2 = nn.Linear(256, 256)
-        self.norm2 = nn.LayerNorm(256)
+        self.fc2 = nn.Linear(64, 64)
+        self.norm2 = nn.LayerNorm(64)
         self.dropout2 = nn.Dropout(dropout_rate)
 
-        self.fc3 = nn.Linear(256, 64)
-        self.norm3 = nn.LayerNorm(64)
+        self.fc3 = nn.Linear(64, 32)
+        self.norm3 = nn.LayerNorm(32)
         self.dropout3 = nn.Dropout(dropout_rate)
 
-        self.out = nn.Linear(64, 2)
+        self.out = nn.Linear(32, 2)
 
     def forward(self, x):
         x = F.relu(self.norm1(self.fc1(x)))
         x = self.dropout1(x)
 
         residual = x  # skip connection 전
-
         x = F.relu(self.norm2(self.fc2(x)))
         x = self.dropout2(x)
-
         x = x + residual  # Residual connection
 
         x = F.relu(self.norm3(self.fc3(x)))
@@ -165,7 +163,7 @@ test_loader = DataLoader(test_dataset, batch_size=4)
 
 # 👉 EarlyStopping 설정
 best_val_loss = float('inf')
-patience = 5
+patience = 3
 patience_counter = 0
 
 # 🔁 학습 루프
