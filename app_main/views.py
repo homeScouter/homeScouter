@@ -1,16 +1,15 @@
-from django.http import JsonResponse
-from .models import Video, Status
+# views.py
+from django.http import HttpResponse, JsonResponse
+from rest_framework.decorators import api_view
+from camera_streamer.capture_api import capture_single_frame
 
-def example_view(request):
-    # 테스트용으로 영상 데이터 삽입 (파일 없이 데이터만 삽입)
-    new_video = Video(video=None, status=Status.NORMAL.name)  # 영상 없이 테스트용 삽입
-    new_video.save()
+@api_view(['GET'])
+def get_latest_frame(request):
+    """
+    API 호출 시 RTSP에서 최신 프레임을 캡처하여 JPEG 이미지로 바로 반환.
+    """
+    jpeg_bytes = capture_single_frame()
+    if jpeg_bytes is None:
+        return JsonResponse({'error': 'Failed to capture frame'}, status=500)
 
-    # MongoDB에서 저장된 첫 번째 영상 데이터 조회
-    video = Video.objects.first()
-
-    return JsonResponse({
-        'message': 'Hello, world!',
-        'video_created_at': video.created_at,
-        'video_status': video.status
-    })
+    return HttpResponse(jpeg_bytes, content_type='image/jpeg')

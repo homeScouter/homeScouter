@@ -27,6 +27,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'app_main',  # MongoDB 연동을 위한 앱
+    'rest_framework',
 ]
 
 MIDDLEWARE = [

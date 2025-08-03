@@ -1,8 +1,7 @@
-# app_main/urls.py
-
+# urls.py
 from django.urls import path
-from . import views  # views에서 API 로직을 처리할 예정
+from . import views
 
 urlpatterns = [
-    path('example/', views.example_view, name='example'),  # 예시 엔드포인트
+    path('latest-frame/', views.get_latest_frame, name='latest_frame'),
 ]
