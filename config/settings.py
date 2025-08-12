@@ -41,25 +41,6 @@ if not firebase_admin._apps:
         })
         print("Firebase Admin SDK 초기화 성공!")
 
-        # --- AUTH 모듈 접근 테스트 시작 ---
-        try:
-            print("AUTH TEST: Firebase Authentication 모듈 접근 테스트 중...")
-            # 존재하지 않는 이메일로 테스트합니다.
-            # 이 라인에서 'CONFIGURATION_NOT_FOUND'가 발생하면 문제가 초기화 직후에 있는 것입니다.
-            # 정상이라면 'auth/user-not-found'와 같은 오류가 나야 합니다.
-            auth.get_user_by_email('test_non_existent_user_for_auth_check_12345@example.com')
-            print("AUTH TEST: Firebase Authentication 모듈 접근 테스트 성공 (CONFIGURATION_NOT_FOUND 아님)!")
-
-        except firebase_admin.exceptions.FirebaseError as auth_err:
-            print(f"AUTH TEST: Firebase Authentication 모듈 접근 중 FirebaseError 발생: {auth_err}")
-            if "CONFIGURATION_NOT_FOUND" in str(auth_err):
-                print(">>> AUTH TEST: 심각: Auth 모듈 접근 시 CONFIGURATION_NOT_FOUND가 발생했습니다. (초기화 직후)")
-            else:
-                print(f">>> AUTH TEST: Auth 모듈 접근 시 예상된 FirebaseError (CONFIGURATION_NOT_FOUND 아님): {auth_err}")
-        except Exception as generic_err:
-            print(f"AUTH TEST: Firebase Authentication 모듈 접근 중 알 수 없는 오류 발생: {generic_err}")
-        # --- AUTH 모듈 접근 테스트 끝 ---
-
     except Exception as e:
         print(f"Firebase Admin SDK 초기화 중 오류 발생: {e}")
         # 심각한 에러면 앱 시작 중단을 원할 경우 아래 주석 해제

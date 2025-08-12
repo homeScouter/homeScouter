@@ -34,7 +34,7 @@ def get_latest_frame(request):
     return HttpResponse(jpeg_bytes, content_type='image/jpeg')
 
 # --- 새로 추가하는 signup_api 뷰 ---
-@api_view(['POST']) # 이 뷰는 POST 요청만 처리하도록 설정합니다.
+@api_view(['POST'])
 def signup_api(request):
     """
     사용자 회원가입 API 엔드포인트.
@@ -42,44 +42,41 @@ def signup_api(request):
     Firestore에 추가 프로필 정보를 저장합니다.
     """
     try:
-        # Django Rest Framework의 request.data는 POST 요청의 JSON 본문을 자동으로 파싱합니다.
         name = request.data.get('name')
-        email = request.data.get('id') # Flutter에서 'id'로 보냈지만, Firebase Auth의 email로 사용
+        email = request.data.get('id')
         password = request.data.get('password')
         phone = request.data.get('phone')
-        tapo_code = request.data.get('tapoCode') # Flutter에서 보낸 TAPO 기기 코드
+        tapo_code = request.data.get('tapoCode')
+        fcm_token = request.data.get('fcmToken') # FCM 토큰을 request.data에서 가져옵니다.
 
-        # 입력 데이터의 기본적인 유효성 검사
-        if not all([name, email, password, phone, tapo_code]):
-            # 필요한 모든 필드가 제공되지 않은 경우 에러 응답
+        # 입력 데이터의 기본적인 유효성 검사 (fcm_token 포함)
+        if not all([name, email, password, phone, tapo_code, fcm_token]):
             return Response(
-                {'message': '이름, 아이디(이메일), 비밀번호, 전화번호, TAPO 기기 코드는 필수 입력 항목입니다.'},
+                {'message': '이름, 아이디(이메일), 비밀번호, 전화번호, TAPO 기기 코드, FCM 토큰은 필수 입력 항목입니다.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # UserAuthService의 비동기 함수 호출
-        # Django 뷰가 동기식인 경우, asyncio.run()을 사용하여 비동기 함수를 실행합니다.
-        # 주의: 이 방법은 짧고 독립적인 비동기 작업에 적합하며,
-        # 긴 비동기 작업을 처리하는 경우에는 Django의 async view (async def)를 사용하는 것이 더 효율적입니다.
-        user_data = asyncio.run(user_auth_service.signup_user(name, email, password, phone, tapo_code))
+            # UserAuthService의 비동기 함수 호출
+            # user_data에는 'uid', 'email', 'name', 'phone', 'tapoCode', 'fcmToken'이 모두 포함되어 있습니다.
+        user_data = asyncio.run(user_auth_service.signup_user(
+                name, email, password, phone, tapo_code, fcm_token
+            ))
 
         # 회원가입 성공 시 201 Created 응답 반환
         return Response(
             {
                 'message': '회원가입이 성공적으로 완료되었습니다.',
-                'uid': user_data['uid'], # Firebase Auth에서 생성된 UID
-                'email': user_data['email'] # 등록된 이메일
+                'user' : user_data
             },
             status=status.HTTP_201_CREATED
         )
 
     except ValueError as e:
-        # firestore_service.py에서 정의된 사용자 정의 에러 처리
         error_code = str(e)
         if error_code == "email-already-in-use":
             return Response(
                 {'message': '이미 사용 중인 이메일(아이디)입니다. 다른 아이디를 사용해주세요.'},
-                status=status.HTTP_409_CONFLICT # 409 Conflict: 요청 충돌
+                status=status.HTTP_409_CONFLICT
             )
         elif error_code == "invalid-email":
             return Response(
@@ -92,14 +89,12 @@ def signup_api(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
         else:
-            # 알 수 없는 사용자 정의 에러
             print(f"알 수 없는 회원가입 관련 오류: {e}")
             return Response(
                 {'message': '회원가입 중 알 수 없는 오류가 발생했습니다. 잠시 후 다시 시도해주세요.'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
     except Exception as e:
-        # Django 서버 내부에서 발생한 예상치 못한 오류
         print(f"서버 내부 오류 발생: {e}")
         return Response(
             {'message': '서버 처리 중 오류가 발생했습니다. 관리자에게 문의해주세요.'},
