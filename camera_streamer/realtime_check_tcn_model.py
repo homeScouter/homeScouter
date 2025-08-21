@@ -35,44 +35,75 @@ def extract_feature(frames_tensor):
     return feat.view(-1).cpu().numpy().reshape(1, -1)
 
 
-# Residual MLP 분류기 모델
-class ResidualMLP(nn.Module):
-    def __init__(self, dropout_rate=0.5):
-        super().__init__()
-        self.fc1 = nn.Linear(512, 128)
-        self.norm1 = nn.LayerNorm(128)
-        self.dropout1 = nn.Dropout(dropout_rate)
+# TCN(Temporal Convolutional Network) 분류기 모델
+class TCNBlock(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size, dilation_rate):
+        super(TCNBlock, self).__init__()
+        self.conv1 = nn.Conv1d(in_channels, out_channels, kernel_size, padding=(kernel_size - 1) * dilation_rate // 2,
+                               dilation=dilation_rate)
+        self.norm1 = nn.BatchNorm1d(out_channels)
+        self.relu1 = nn.ReLU()
+        self.dropout1 = nn.Dropout(0.2)
 
-        self.fc2 = nn.Linear(128, 128)
-        self.norm2 = nn.LayerNorm(128)
-        self.dropout2 = nn.Dropout(dropout_rate)
+        self.conv2 = nn.Conv1d(out_channels, out_channels, kernel_size, padding=(kernel_size - 1) * dilation_rate // 2,
+                               dilation=dilation_rate)
+        self.norm2 = nn.BatchNorm1d(out_channels)
+        self.relu2 = nn.ReLU()
+        self.dropout2 = nn.Dropout(0.2)
 
-        self.fc3 = nn.Linear(128, 32)
-        self.norm3 = nn.LayerNorm(32)
-        self.dropout3 = nn.Dropout(dropout_rate)
-
-        self.out = nn.Linear(32, 2)
+        self.downsample = nn.Conv1d(in_channels, out_channels, 1) if in_channels != out_channels else None
 
     def forward(self, x):
-        x = F.relu(self.norm1(self.fc1(x)))
-        x = self.dropout1(x)
         residual = x
-        x = F.relu(self.norm2(self.fc2(x)))
-        x = self.dropout2(x)
-        x = x + residual
-        x = F.relu(self.norm3(self.fc3(x)))
-        x = self.dropout3(x)
-        return self.out(x)
+        if self.downsample:
+            residual = self.downsample(residual)
+
+        out = self.conv1(x)
+        out = self.norm1(out)
+        out = self.relu1(out)
+        out = self.dropout1(out)
+
+        out = self.conv2(out)
+        out = self.norm2(out)
+        out = self.relu2(out)
+        out = self.dropout2(out)
+
+        return F.relu(out + residual)
 
 
-# MLP 모델 로드
-model_clf = ResidualMLP().to(device)
+class TCNClassifier(nn.Module):
+    def __init__(self, input_size=512, num_channels=[64, 128], kernel_size=3):
+        super(TCNClassifier, self).__init__()
+        self.blocks = nn.ModuleList([
+            TCNBlock(input_size if i == 0 else num_channels[i - 1],
+                     num_channels[i],
+                     kernel_size,
+                     2 ** i) for i in range(len(num_channels))
+        ])
+        self.pool = nn.AdaptiveAvgPool1d(1)
+        self.fc = nn.Linear(num_channels[-1], 2)
+
+    def forward(self, x):
+        # [batch_size, 512] -> [batch_size, 1, 512]
+        x = x.unsqueeze(1)
+
+        for block in self.blocks:
+            x = block(x)
+
+        x = self.pool(x).squeeze(-1)
+        x = self.fc(x)
+
+        return x
+
+
+# TCN 모델 로드
+model_clf = TCNClassifier().to(device)
 try:
-    model_clf.load_state_dict(torch.load('best_residual_mlp_model_new.pth', map_location=device))
+    model_clf.load_state_dict(torch.load('best_tcn_model.pth', map_location=device))
     model_clf.eval()
-    print("✅ MLP 모델 가중치 로드 완료")
+    print("✅ TCN 모델 가중치 로드 완료")
 except FileNotFoundError:
-    print("❌ best_residual_mlp_model.pth 파일을 찾을 수 없습니다. 모델을 먼저 학습시키고 저장하세요.")
+    print("❌ best_tcn_model.pth 파일을 찾을 수 없습니다. 모델을 먼저 학습시키고 저장하세요.")
     exit()
 
 
@@ -112,7 +143,7 @@ def process_stream_continuously(rtsp_url, interval_sec=4, num_frames_per_interva
     """
     RTSP 스트림을 실시간으로 읽고, 지정된 간격마다 분석을 수행합니다.
     """
-    frame_queue = queue.Queue(maxsize=180)  # 최대 120 프레임 (4초) 버퍼
+    frame_queue = queue.Queue(maxsize=120)  # 최대 120 프레임 (4초) 버퍼
 
     # 캡처 스레드 시작
     grabber = RTSPFrameGrabber(rtsp_url, frame_queue)

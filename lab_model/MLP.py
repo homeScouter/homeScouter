@@ -163,16 +163,16 @@ class ResidualMLP(nn.Module):
 
 model_clf = ResidualMLP().to(device)
 criterion = nn.CrossEntropyLoss()
-optimizer = torch.optim.Adam(model_clf.parameters(), lr=1e-6)
+optimizer = torch.optim.Adam(model_clf.parameters(), lr=1e-5)
 
 # DataLoader 준비 (PCA 제거된 데이터 사용)
 train_dataset = VideoFeatureDataset(train_x_, train_y_)
 val_dataset = VideoFeatureDataset(val_x, val_y)
 test_dataset = VideoFeatureDataset(test_x, test_y_bin)
 
-train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True)
-val_loader = DataLoader(val_dataset, batch_size=8)
-test_loader = DataLoader(test_dataset, batch_size=8)
+train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True)
+val_loader = DataLoader(val_dataset, batch_size=16)
+test_loader = DataLoader(test_dataset, batch_size=16)
 
 # EarlyStopping 설정
 best_val_loss = float('inf')
@@ -243,4 +243,4 @@ print("📊 Classification Report:")
 print(classification_report(all_labels, all_preds, target_names=["Normal", "Abnormal"]))
 
 # 모델 저장
-torch.save(model_clf.state_dict(), 'camera_streamer/best_residual_mlp_model.pth')
+torch.save(model_clf.state_dict(), '../camera_streamer/best_residual_mlp_model_before.pth')

@@ -48,7 +48,7 @@ def extract_feature(frames, feature_extractor, device):
     return feat.view(-1).cpu()
 
 
-def load_dataset(root_folder, feature_extractor, device, cache_folder="cache_features_add"):
+def load_dataset(root_folder, feature_extractor, device, cache_folder="cache_features_add2"):
     """
     캐싱 기능을 포함하여 데이터셋을 로드하고 특징을 추출합니다.
     """
@@ -128,15 +128,15 @@ train_x_, val_x, train_y_, val_y = train_test_split(
 class ResidualMLP(nn.Module):
     def __init__(self, dropout_rate=0.5):
         super().__init__()
-        self.fc1 = nn.Linear(512, 64)
-        self.norm1 = nn.LayerNorm(64)
+        self.fc1 = nn.Linear(512, 128)
+        self.norm1 = nn.LayerNorm(128)
         self.dropout1 = nn.Dropout(dropout_rate)
 
-        self.fc2 = nn.Linear(64, 64)
-        self.norm2 = nn.LayerNorm(64)
+        self.fc2 = nn.Linear(128, 128)
+        self.norm2 = nn.LayerNorm(128)
         self.dropout2 = nn.Dropout(dropout_rate)
 
-        self.fc3 = nn.Linear(64, 32)
+        self.fc3 = nn.Linear(128, 32)
         self.norm3 = nn.LayerNorm(32)
         self.dropout3 = nn.Dropout(dropout_rate)
 
@@ -250,4 +250,4 @@ print("📊 Classification Report:")
 print(classification_report(all_labels, all_preds, target_names=["Normal", "Abnormal"]))
 
 # 모델 저장
-torch.save(model_clf.state_dict(), 'camera_streamer/best_residual_mlp_model.pth')
+torch.save(model_clf.state_dict(), 'camera_streamer/best_residual_mlp_model_new.pth')
