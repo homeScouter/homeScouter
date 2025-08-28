@@ -15,6 +15,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'your_default_secret_key_if_not_in_env')
 DEBUG = os.getenv('DEBUG', 'True') == 'True'
 ALLOWED_HOSTS = []
+FIREBASE_STORAGE_BUCKET = 'home-scouter-50835.firebasestorage.app'
 
 # --- Firebase Admin SDK 및 Firestore 초기화 시작 ---
 # 앱이 이미 초기화되었는지 확인하여 중복 초기화를 방지합니다.
@@ -66,6 +67,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'app_main',
     'rest_framework',
+    'abnormalevents'
 ]
 
 MIDDLEWARE = [
