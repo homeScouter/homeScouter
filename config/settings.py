@@ -67,7 +67,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'app_main',
     'rest_framework',
-    'abnormalevents'
+    'abnormalevents',
+    'camera_streamer',
 ]
 
 MIDDLEWARE = [
@@ -86,3 +87,32 @@ CORS_ALLOWED_ORIGINS = [
 ROOT_URLCONF = 'config.urls'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 STATIC_URL = '/static/'
+
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'level': 'INFO',  # 로그 레벨을 'DEBUG'로 설정
+            'class': 'logging.StreamHandler',
+        },
+        'file': {
+            'level': 'DEBUG',  # 로그 레벨을 'DEBUG'로 설정
+            'class': 'logging.FileHandler',
+            'filename': 'app_logs.log',  # 로그를 저장할 파일 경로
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console', 'file'],  # 콘솔과 파일 모두 출력
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+        'camera_streamer': {  # 이 부분을 사용하면 특정 앱에 대해서도 로그를 설정할 수 있음
+            'handlers': ['console', 'file'],
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+    },
+}

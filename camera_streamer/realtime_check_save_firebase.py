@@ -13,6 +13,15 @@ from dotenv import load_dotenv  # 환경 변수 로드를 위해 추가
 
 from settings import RTSP_URL, CAPTURE_INTERVAL
 
+# 로깅 초기화
+import logging
+logger = logging.getLogger('camera_streamer')  # 로거 이름 설정
+logger.setLevel(logging.INFO)  # 로깅 레벨 설정 (INFO 이상의 로그만 출력)
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+console_handler = logging.StreamHandler()
+console_handler.setFormatter(formatter)
+logger.addHandler(console_handler)
+
 # .env 파일 로드 (환경 변수 사용 시 필요)
 load_dotenv()
 
@@ -24,11 +33,11 @@ if not firebase_admin._apps:
     cred_path = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
 
     if not cred_path:
-        print("❌ 오류: 환경변수 'GOOGLE_APPLICATION_CREDENTIALS'가 설정되어 있지 않습니다.")
+        logger.error("오류: 환경변수 'GOOGLE_APPLICATION_CREDENTIALS'가 설정되어 있지 않습니다.")
         exit()
 
     if not os.path.isfile(cred_path):
-        print(f"❌ 오류: 서비스 계정 키 파일이 존재하지 않습니다: {cred_path}")
+        logger.error(f"오류: 서비스 계정 키 파일이 존재하지 않습니다: {cred_path}")
         exit()
 
     try:
@@ -36,16 +45,15 @@ if not firebase_admin._apps:
         firebase_admin.initialize_app(cred, {
             'storageBucket': 'home-scouter-50835.firebasestorage.app',
         })
-        print("✅ Firebase Admin SDK 초기화 완료")
+        logger.info("Firebase Admin SDK 초기화 완료")
     except Exception as e:
-        print(f"❌ Firebase Admin SDK 초기화 중 오류 발생: {e}")
+        logger.error(f"Firebase Admin SDK 초기화 중 오류 발생: {e}")
         exit()
 else:
-    print("Firebase Admin SDK는 이미 초기화되어 있습니다.")
+    logger.info("Firebase Admin SDK는 이미 초기화되어 있습니다.")
 
 # Firestore 클라이언트 초기화
-db = firestore.client()   ### NEW
-
+db = firestore.client()
 
 # ------------- Firebase 업로드 함수 (에러 로깅 강화) -------------
 def upload_to_firebase(local_path, cloud_path):
@@ -57,22 +65,22 @@ def upload_to_firebase(local_path, cloud_path):
         bucket = storage.bucket()
         blob = bucket.blob(cloud_path)
         blob.upload_from_filename(local_path)
-        print(f"✅ '{local_path}' → Firebase Storage '{cloud_path}' 업로드 완료.")
+        logger.info(f"'{local_path}' → Firebase Storage '{cloud_path}' 업로드 완료.")
 
         # 업로드 성공 후 로컬 파일 삭제
         os.remove(local_path)
-        print(f"🗑️ '{local_path}' 임시 파일 삭제 완료.")
+        logger.info(f"'{local_path}' 임시 파일 삭제 완료.")
 
         # 서명된 URL 생성 (만료 시간 1시간)
         url = blob.generate_signed_url(version="v4", expiration=3600)
         return url
     except Exception as e:
-        print(f"❌ Firebase 업로드 실패: '{local_path}' → '{cloud_path}'")
-        print(f"❌ 오류 상세: {e}")
+        logger.error(f"Firebase 업로드 실패: '{local_path}' → '{cloud_path}'")
+        logger.error(f"오류 상세: {e}")
         return None
 
 
-# ------------- Firestore 저장 함수 -------------  ### NEW
+# ------------- Firestore 저장 함수 -------------
 def save_event_to_firestore(event_type, image_url, video_url, probability, timestamp):
     """
     Firestore에 이벤트 메타데이터 저장
@@ -86,9 +94,9 @@ def save_event_to_firestore(event_type, image_url, video_url, probability, times
             "probability": probability.tolist() if probability is not None else None,
             "timestamp": firestore.SERVER_TIMESTAMP
         })
-        print(f"✅ Firestore에 이벤트 저장 완료 (ID: {timestamp})")
+        logger.info(f"Firestore에 이벤트 저장 완료 (ID: {timestamp})")
     except Exception as e:
-        print(f"❌ Firestore 저장 실패: {e}")
+        logger.error(f"Firestore 저장 실패: {e}")
 
 
 # ------------- 모델 정의 및 로드 -------------
@@ -98,7 +106,6 @@ model_3d.eval()
 feature_extractor = torch.nn.Sequential(*list(model_3d.children())[:-1])
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 feature_extractor.to(device)
-
 
 def extract_feature(frames_tensor):
     """3D CNN 모델을 사용하여 특징 추출"""
@@ -144,9 +151,9 @@ model_clf = ResidualMLP().to(device)
 try:
     model_clf.load_state_dict(torch.load('best_residual_mlp_model_new.pth', map_location=device))
     model_clf.eval()
-    print("✅ MLP 모델 가중치 로드 완료")
+    logger.info("MLP 모델 가중치 로드 완료")  # 특수문자 제거
 except FileNotFoundError:
-    print("❌ best_residual_mlp_model.pth 파일을 찾을 수 없습니다.")
+    logger.error("best_residual_mlp_model.pth 파일을 찾을 수 없습니다.")
     exit()
 
 
@@ -168,12 +175,12 @@ class RTSPFrameGrabber(threading.Thread):
             self.cap.release()
         self.cap = cv2.VideoCapture(self.rtsp_url)
         if not self.cap.isOpened():
-            print(f"⚠️ 카메라 연결 실패: {self.rtsp_url}")
+            logger.error(f"카메라 연결 실패: {self.rtsp_url}")
         else:
-            print(f"✅ 카메라 연결 성공: {self.rtsp_url}")
+            logger.info(f"카메라 연결 성공: {self.rtsp_url}")
 
     def run(self):
-        print("🎥 RTSP 프레임 캡처 스레드 시작...")
+        logger.info("RTSP 프레임 캡처 스레드 시작...")
         retry_count = 0
         MAX_RETRIES = 10
         RETRY_DELAY = 5
@@ -181,10 +188,10 @@ class RTSPFrameGrabber(threading.Thread):
         while self.running:
             if not self.cap or not self.cap.isOpened():
                 if retry_count >= MAX_RETRIES:
-                    print("🚫 최대 재연결 시도 초과.")
+                    logger.error("최대 재연결 시도 초과.")
                     self.running = False
                     break
-                print(f"프레임 수신 불가, 재연결 시도... ({retry_count + 1}/{MAX_RETRIES})")
+                logger.info(f"프레임 수신 불가, 재연결 시도... ({retry_count + 1}/{MAX_RETRIES})")
                 self._connect_camera()
                 retry_count += 1
                 time.sleep(RETRY_DELAY)
@@ -193,7 +200,7 @@ class RTSPFrameGrabber(threading.Thread):
             try:
                 ret, frame = self.cap.read()
                 if not ret:
-                    print(f"프레임 수신 실패, 재연결 시도... ({retry_count + 1}/{MAX_RETRIES})")
+                    logger.info(f"프레임 수신 실패, 재연결 시도... ({retry_count + 1}/{MAX_RETRIES})")
                     self._connect_camera()
                     retry_count += 1
                     time.sleep(RETRY_DELAY)
@@ -207,12 +214,12 @@ class RTSPFrameGrabber(threading.Thread):
                     self.frame_queue.put(frame)
 
             except cv2.error as e:
-                print(f"❌ OpenCV 오류: {e}")
+                logger.error(f"OpenCV 오류: {e}")
                 self._connect_camera()
                 retry_count += 1
                 time.sleep(RETRY_DELAY)
             except Exception as e:
-                print(f"❌ RTSP 캡처 중 오류: {e}")
+                logger.error(f"RTSP 캡처 중 오류: {e}")
                 self.running = False
                 break
 
@@ -220,7 +227,7 @@ class RTSPFrameGrabber(threading.Thread):
         self.running = False
         if self.cap:
             self.cap.release()
-        print("🛑 RTSP 프레임 캡처 스레드 종료.")
+        logger.info("RTSP 프레임 캡처 스레드 종료.")
 
 
 def process_stream_continuously(rtsp_url, interval_sec=CAPTURE_INTERVAL, num_frames_per_interval=16):
@@ -233,12 +240,12 @@ def process_stream_continuously(rtsp_url, interval_sec=CAPTURE_INTERVAL, num_fra
     label_map_inv = {0: "정상 (Normal)", 1: "비정상 (Abnormal)"}
     frame_buffer = []
 
-    print(f"▶️ 실시간 분석 시작 (간격: {interval_sec}초)...")
+    logger.info(f"실시간 분석 시작 (간격: {interval_sec}초)...")
 
     try:
         while True:
             if not grabber.running and frame_queue.empty():
-                print("메인 스레드: 캡처 스레드 종료됨.")
+                logger.info("메인 스레드: 캡처 스레드 종료됨.")
                 break
 
             try:
@@ -249,7 +256,7 @@ def process_stream_continuously(rtsp_url, interval_sec=CAPTURE_INTERVAL, num_fra
 
             current_time = time.time()
             if current_time - last_analysis_time >= interval_sec:
-                print(f"\n--- {interval_sec}초 영상 분석 ---")
+                logger.info(f"\n--- {interval_sec}초 영상 분석 ---")
 
                 if len(frame_buffer) > 0:
                     frames_to_analyze = []
@@ -270,10 +277,10 @@ def process_stream_continuously(rtsp_url, interval_sec=CAPTURE_INTERVAL, num_fra
                         pred_label_idx = torch.argmax(probabilities, dim=1).item()
 
                     predicted_label = label_map_inv[pred_label_idx]
-                    print(f"✨ 예측 결과: {predicted_label} | 확률: {probabilities.cpu().numpy()[0]}")
+                    logger.info(f"예측 결과: {predicted_label} | 확률: {probabilities.cpu().numpy()[0]}")
 
                     if pred_label_idx == 1:  # Abnormal
-                        print("🚨 비정상 감지! Firebase 업로드 + Firestore 저장")
+                        logger.info("비정상 감지! Firebase 업로드 + Firestore 저장")
                         timestamp = int(time.time())
                         image_filename = f'abnormal_event_{timestamp}.jpg'
                         video_filename = f'abnormal_video_{timestamp}.avi'
@@ -310,7 +317,7 @@ def process_stream_continuously(rtsp_url, interval_sec=CAPTURE_INTERVAL, num_fra
                             )
 
                         except Exception as e:
-                            print(f"🚨 비정상 이벤트 저장 중 오류: {e}")
+                            logger.error(f"비정상 이벤트 저장 중 오류: {e}")
                         finally:
                             if img_tmp_file and os.path.exists(img_tmp_file.name):
                                 try: os.remove(img_tmp_file.name)
@@ -319,10 +326,10 @@ def process_stream_continuously(rtsp_url, interval_sec=CAPTURE_INTERVAL, num_fra
                                 try: os.remove(vid_tmp_file.name)
                                 except: pass
                     else:
-                        print("✅ 정상 상황입니다.")
+                        logger.info("정상 상황입니다.")
 
                 else:
-                    print("⚠️ 프레임 버퍼 비어있음.")
+                    logger.info("프레임 버퍼 비어있음.")
 
                 frame_buffer = []
                 last_analysis_time = current_time
@@ -330,16 +337,14 @@ def process_stream_continuously(rtsp_url, interval_sec=CAPTURE_INTERVAL, num_fra
             time.sleep(0.01)
 
     except KeyboardInterrupt:
-        print("\n👋 사용자 요청 종료")
+        logger.info("\n사용자 요청 종료")
     except Exception as e:
-        print(f"❌ 메인 스레드 오류: {e}")
+        logger.error(f"메인 스레드 오류: {e}")
     finally:
         grabber.stop()
         grabber.join()
         cv2.destroyAllWindows()
-        print("✅ 리소스 해제 완료")
-
-
+        logger.info("리소스 해제 완료")
 
 if __name__ == "__main__":
     process_stream_continuously(RTSP_URL)
